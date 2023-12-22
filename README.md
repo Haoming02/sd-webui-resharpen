@@ -55,5 +55,6 @@ since the Diffusion is a denoising process, if I add the delta again, then it wi
 if I subtract the delta, then it will basically add the noise back to create a noisy image.
 
 ## To Do
-- [ ] Generation InfoText
+- [X] Generation InfoText
+- [X] Pasting InfoText Support
 - [ ] X/Y/Z Plot Support

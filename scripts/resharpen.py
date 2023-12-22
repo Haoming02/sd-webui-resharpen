@@ -18,6 +18,7 @@ def hijack_callback(self, d):
 
 KDiffusionSampler.callback_state = hijack_callback
 
+
 class ReSharpen(scripts.Script):
 
     def title(self):
@@ -34,6 +35,19 @@ class ReSharpen(scripts.Script):
             if is_img2img is not True:
                 hr_decay = gr.Slider(label="Hires. Fix Sharpness", minimum=-1.0, maximum=1.0, step=0.05, value=0.0)
 
+        self.paste_field_names = [
+            (enable, lambda d: enable.update(value=("Resharpen" in d))),
+            (decay, "Resharpen")
+        ]
+        self.infotext_fields = [
+            (enable, lambda d: enable.update(value=("Resharpen" in d))),
+            (decay, "Resharpen")
+        ]
+
+        if is_img2img is not True:
+              self.paste_field_names.append((hr_decay, "Resharpen HR"))
+              self.infotext_fields.append((hr_decay, "Resharpen HR"))
+
         if is_img2img is not True:
             return [enable, decay, hr_decay]
         else:
@@ -43,8 +57,13 @@ class ReSharpen(scripts.Script):
         KDiffusionSampler.trajectory_enable = enable
 
         if enable is True:
+
+            if p.sampler_name.strip() == 'Euler a':
+                print('\n[Resharpen] has little effect when using an Ancestral sampler! Consider switching to Euler instead.\n')
+
             KDiffusionSampler.traj_decay = decay / -10.0
             KDiffusionSampler.traj_cache = None
+            p.extra_generation_params['Resharpen'] = decay
 
         return p
 
@@ -52,6 +71,10 @@ class ReSharpen(scripts.Script):
         if enable is True:
             KDiffusionSampler.traj_decay = hr_decay / -10.0
             KDiffusionSampler.traj_cache = None
+            p.extra_generation_params['Resharpen HR'] = hr_decay
+
+        return p
+
 
 def restore_callback():
     KDiffusionSampler.callback_state = original_callback
