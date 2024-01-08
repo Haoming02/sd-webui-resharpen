@@ -57,4 +57,8 @@ if I subtract the delta, then it will basically add the noise back to create a n
 ## To Do
 - [X] Generation InfoText
 - [X] Pasting InfoText Support
-- [ ] X/Y/Z Plot Support
+- [X] X/Y/Z Plot Support
+
+<p align="center">
+<img src="samples/xyz.jpg">
+</p>

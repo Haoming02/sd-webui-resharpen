@@ -1,7 +1,11 @@
 from modules.sd_samplers_kdiffusion import KDiffusionSampler
 from modules import script_callbacks
+
+from scripts.res_xyz import xyz_support
+
 import modules.scripts as scripts
 import gradio as gr
+
 
 original_callback = KDiffusionSampler.callback_state
 
@@ -10,13 +14,17 @@ def hijack_callback(self, d):
         return original_callback(self, d)
 
     if self.traj_cache is not None:
-        delta = d['x'] - self.traj_cache
+        delta = d['x'].detach().clone() - self.traj_cache
         d['x'] += delta * self.traj_decay
 
-    self.traj_cache = d['x']
+    self.traj_cache = d['x'].detach().clone()
     return original_callback(self, d)
 
 KDiffusionSampler.callback_state = hijack_callback
+
+
+XYZ_CACHE = {}
+xyz_support(XYZ_CACHE)
 
 
 class ReSharpen(scripts.Script):
@@ -54,6 +62,11 @@ class ReSharpen(scripts.Script):
             return [enable, decay, decay]
 
     def process(self, p, enable:bool, decay:float, hr_decay:float):
+        if 'decay' in XYZ_CACHE.keys():
+            enable = True
+            decay = float(XYZ_CACHE['decay'])
+            del XYZ_CACHE['decay']
+
         KDiffusionSampler.trajectory_enable = enable
 
         if enable is True:
@@ -68,7 +81,15 @@ class ReSharpen(scripts.Script):
         return p
 
     def before_hr(self, p, enable:bool, decay:float, hr_decay:float):
+        if 'hr_decay' in XYZ_CACHE.keys():
+            enable = True
+            hr_decay = float(XYZ_CACHE['hr_decay'])
+            del XYZ_CACHE['hr_decay']
+
+        KDiffusionSampler.trajectory_enable = enable
+
         if enable is True:
+
             KDiffusionSampler.traj_decay = hr_decay / -10.0
             KDiffusionSampler.traj_cache = None
             p.extra_generation_params['Resharpen HR'] = hr_decay
