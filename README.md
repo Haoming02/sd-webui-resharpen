@@ -31,11 +31,11 @@ You can set positive for the normal pass and negative for the hr pass, or vice v
     <tbody align="center">
         <tr>
             <td>Result</td>
-            <td><img src="samples\-0.5.jpg" width=128></td>
-            <td><img src="samples\-0.25.jpg" width=128></td>
-            <td><img src="samples\0.0.jpg" width=128></td>
-            <td><img src="samples\0.25.jpg" width=128></td>
-            <td><img src="samples\0.5.jpg" width=128></td>
+            <td><img src="samples\-05.jpg" width=128></td>
+            <td><img src="samples\-025.jpg" width=128></td>
+            <td><img src="samples\00.jpg" width=128></td>
+            <td><img src="samples\025.jpg" width=128></td>
+            <td><img src="samples\05.jpg" width=128></td>
         </tr>
     </tbody>
 </table>
@@ -60,5 +60,5 @@ if I subtract the delta, then it will basically add the noise back to create a n
 - [X] X/Y/Z Plot Support
 
 <p align="center">
-<img src="samples/xyz.jpg">
+<img src="samples/plot.jpg">
 </p>
