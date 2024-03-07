@@ -1,11 +1,15 @@
 import modules.scripts as scripts
 
+
 def grid_reference():
     for data in scripts.scripts_data:
         if data.script_class.__module__ == 'xyz_grid.py' and hasattr(data, "module"):
             return data.module
 
-def xyz_support(cache):
+    raise SystemError("Could not find X/Y/Z Plot...")
+
+
+def xyz_support(cache: dict):
 
     def apply_field(field):
         def _(p, x, xs):

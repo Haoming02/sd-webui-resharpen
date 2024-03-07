@@ -13,6 +13,8 @@ There is simply a slider that controls the "sharpness" of the images, defaulting
 For `txt2img`, there is also a second slider for the `Hires. Fix` pass.
 You can set positive for the normal pass and negative for the hr pass, or vice versa, for some interesting effects.
 
+> By default, this Extension is disabled during the [ADetailer](https://github.com/Bing-su/adetailer) phase 
+
 **Note:** `Ancestral` samplers *(**eg.** `Euler a`)* do **not** work. Tested and confirmed to work for both `Euler` and `DPM++ 2M Karras`.
 
 ## Samples
