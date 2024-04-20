@@ -39,13 +39,13 @@ class ReSharpen(scripts.Script):
 
     def ui(self, is_img2img):
         with gr.Accordion('ReSharpen', open=False):
-            enable = gr.Checkbox(label="Enable")
+            enable = gr.Checkbox(label="Enable", elem_id='resharpen_enabled')
 
             gr.Markdown('<h3 style="float: left;">Softer</h3> <h3 style="float: right;">Sharper</h3>')
-            decay = gr.Slider(label="Sharpness", minimum=-1.0, maximum=1.0, step=0.05, value=0.0)
+            decay = gr.Slider(label="Sharpness", minimum=-1.0, maximum=1.0, step=0.05, value=0.0, elem_id='resharpen_sharpness')
 
             if not is_img2img:
-                hr_decay = gr.Slider(label="Hires. Fix Sharpness", minimum=-1.0, maximum=1.0, step=0.05, value=0.0)
+                hr_decay = gr.Slider(label="Hires. Fix Sharpness", minimum=-1.0, maximum=1.0, step=0.05, value=0.0, elem_id='resharpen_hrsharpness')
 
         self.paste_field_names = [
             (enable, lambda d: enable.update(value=("Resharpen" in d))),
