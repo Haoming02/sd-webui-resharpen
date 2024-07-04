@@ -33,6 +33,12 @@ def xyz_support(cache: dict):
         xyz_grid.AxisOption(
             "[ReSharpen] Scaling", str, apply_field("scaling"), choices=choices_scaling
         ),
+        xyz_grid.AxisOption(
+            "[ReSharpen] HrF. Scaling",
+            str,
+            apply_field("hr_scaling"),
+            choices=choices_scaling,
+        ),
     ]
 
     xyz_grid.axis_options.extend(extra_axis_options)

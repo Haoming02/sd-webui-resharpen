@@ -1,32 +1,15 @@
 from modules.sd_samplers_kdiffusion import KDiffusionSampler
-from modules import script_callbacks, shared
-import modules.scripts as scripts
-
+from scripts.res_scaling import apply_scaling
 from scripts.res_xyz import xyz_support
-
-from math import cos, sin, pi
+from modules import script_callbacks
+import modules.scripts as scripts
+import modules.shared as opts
 import gradio as gr
 
-
-def apply_scaling(alg: str, decay: float, current_step: int, total_steps: int) -> float:
-    if alg == "Flat":
-        return decay
-
-    ratio = float(current_step / total_steps)
-    rad = ratio * pi / 2
-
-    match alg:
-        case "Cos":
-            mod = cos(rad)
-        case "Sin":
-            mod = sin(rad)
-        case "1 - Cos":
-            mod = 1 - cos(rad)
-        case "1 - Sin":
-            mod = 1 - sin(rad)
-
-    return decay * mod
-
+from modules.processing import (
+    StableDiffusionProcessingTxt2Img,
+    StableDiffusionProcessingImg2Img,
+)
 
 original_callback = KDiffusionSampler.callback_state
 
@@ -69,8 +52,14 @@ class ReSharpen(scripts.Script):
             gr.Markdown(
                 '<h3 style="float: left;">Softer</h3> <h3 style="float: right;">Sharper</h3>'
             )
+
             decay = gr.Slider(
                 label="Sharpness", minimum=-1.0, maximum=1.0, step=0.1, value=0.0
+            )
+            scaling = gr.Radio(
+                ["Flat", "Cos", "Sin", "1 - Cos", "1 - Sin"],
+                label="Scaling Settings",
+                value="Flat",
             )
 
             if not is_img2img:
@@ -81,9 +70,7 @@ class ReSharpen(scripts.Script):
                     step=0.1,
                     value=0.0,
                 )
-
-            with gr.Accordion("Advanced Settings", open=False):
-                scaling = gr.Radio(
+                hr_scaling = gr.Radio(
                     ["Flat", "Cos", "Sin", "1 - Cos", "1 - Sin"],
                     label="Scaling Settings",
                     value="Flat",
@@ -98,19 +85,31 @@ class ReSharpen(scripts.Script):
 
         if not is_img2img:
             self.infotext_fields.append((hr_decay, "Resharpen Sharpness Hires"))
+            self.infotext_fields.append((hr_scaling, "Resharpen Scaling Hires"))
 
         for comp, name in self.infotext_fields:
             comp.do_not_save_to_config = True
             self.paste_field_names.append(name)
 
         if not is_img2img:
-            return [enable, decay, hr_decay, scaling]
+            return [enable, decay, scaling, hr_decay, hr_scaling]
         else:
-            return [enable, decay, decay, scaling]
+            return [enable, decay, scaling, decay, scaling]
 
-    def process(self, p, enable: bool, decay: float, hr_decay: float, scaling: str):
+    def process(
+        self,
+        p,
+        enable: bool,
+        decay: float,
+        scaling: str,
+        hr_decay: float,
+        hr_scaling: str,
+    ):
         if not enable:
             self.XYZ_CACHE.clear()
+            return p
+
+        KDiffusionSampler.trajectory_enable = enable
 
         if "decay" in self.XYZ_CACHE:
             decay = float(self.XYZ_CACHE["decay"])
@@ -118,10 +117,7 @@ class ReSharpen(scripts.Script):
 
         if "scaling" in self.XYZ_CACHE:
             scaling = str(self.XYZ_CACHE["scaling"])
-            if not getattr(p, "enable_hr", False):
-                del self.XYZ_CACHE["scaling"]
-
-        KDiffusionSampler.trajectory_enable = enable
+            del self.XYZ_CACHE["scaling"]
 
         if enable:
             p.extra_generation_params["Resharpen Enabled"] = enable
@@ -129,30 +125,46 @@ class ReSharpen(scripts.Script):
             p.extra_generation_params["Resharpen Scaling"] = scaling
 
             if p.sampler_name.strip() == "Euler a":
-                print(
-                    "\n[Resharpen] has little effect when using an Ancestral sampler! Consider switching to Euler instead.\n"
-                )
+                print("\n[Resharpen] has little effect with Ancestral samplers!\n")
 
             KDiffusionSampler.traj_decay = decay / -10.0
             KDiffusionSampler.traj_cache = None
             KDiffusionSampler.traj_scaling = scaling
 
-            steps: int = p.steps
-            # is img2img & do full steps
-            if not hasattr(p, "enable_hr") and not shared.opts.img2img_fix_steps:
-                if getattr(p, "denoising_strength", 1.0) < 1.0:
-                    steps = int(steps * getattr(p, "denoising_strength", 1.0) + 1.0)
+            if isinstance(p, StableDiffusionProcessingImg2Img):
+                self.XYZ_CACHE.clear()
+                dnstr: float = getattr(p, "denoising_strength", 1.0)
+                if dnstr < 1.0 and not opts.img2img_fix_steps:
+                    KDiffusionSampler.traj_totalsteps = int(p.steps * dnstr + 1.0)
 
-            KDiffusionSampler.traj_totalsteps = steps
+            else:
+                assert isinstance(p, StableDiffusionProcessingTxt2Img)
+                KDiffusionSampler.traj_totalsteps = p.steps
 
-            if getattr(p, "enable_hr", False):
-                if "hr_decay" in self.XYZ_CACHE:
-                    hr_decay = float(self.XYZ_CACHE["hr_decay"])
-                p.extra_generation_params["Resharpen Sharpness Hires"] = hr_decay
+                if getattr(p, "enable_hr", False):
+                    if "hr_decay" in self.XYZ_CACHE:
+                        hr_decay = float(self.XYZ_CACHE["hr_decay"])
+                    if "hr_scaling" in self.XYZ_CACHE:
+                        hr_scaling = str(self.XYZ_CACHE["hr_scaling"])
 
+                    p.extra_generation_params["Resharpen Sharpness Hires"] = hr_decay
+                    p.extra_generation_params["Resharpen Scaling Hires"] = hr_scaling
+
+                else:
+                    self.XYZ_CACHE.clear()
+
+        assert len(self.XYZ_CACHE) <= 2
         return p
 
-    def before_hr(self, p, enable: bool, decay: float, hr_decay: float, scaling: str):
+    def before_hr(
+        self,
+        p,
+        enable: bool,
+        decay: float,
+        scaling: str,
+        hr_decay: float,
+        hr_scaling: str,
+    ):
         if not enable:
             return p
 
@@ -160,14 +172,16 @@ class ReSharpen(scripts.Script):
             hr_decay = float(self.XYZ_CACHE["hr_decay"])
             del self.XYZ_CACHE["hr_decay"]
 
-        if "scaling" in self.XYZ_CACHE:
-            scaling = str(self.XYZ_CACHE["scaling"])
-            del self.XYZ_CACHE["scaling"]
+        if "hr_scaling" in self.XYZ_CACHE:
+            hr_scaling = str(self.XYZ_CACHE["hr_scaling"])
+            del self.XYZ_CACHE["hr_scaling"]
 
         KDiffusionSampler.traj_decay = hr_decay / -10.0
         KDiffusionSampler.traj_cache = None
-        KDiffusionSampler.traj_scaling = scaling
+        KDiffusionSampler.traj_scaling = hr_scaling
+        KDiffusionSampler.traj_totalsteps = p.hr_second_pass_steps
 
+        assert len(self.XYZ_CACHE) == 0
         return p
 
 

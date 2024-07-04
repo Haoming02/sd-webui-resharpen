@@ -13,7 +13,7 @@ There is simply a slider that controls the "sharpness" of the images, defaulting
 For `txt2img`, there is also a second slider for the `Hires. Fix` pass.
 You can set positive for the normal pass and negative for the hr pass, or vice versa, for some interesting effects.
 
-There is also an advanced scaling setting, allowing you to adjust the strength throughout the process *(**eg.** lower the sharpness towards the end)*.
+There is also now a scaling setting, allowing you to adjust the strength throughout the process *(**eg.** lower the sharpness towards the end)*.
 
 > This Extension is disabled during the [ADetailer](https://github.com/Bing-su/adetailer) phase
 
