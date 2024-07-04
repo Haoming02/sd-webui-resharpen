@@ -13,7 +13,9 @@ There is simply a slider that controls the "sharpness" of the images, defaulting
 For `txt2img`, there is also a second slider for the `Hires. Fix` pass.
 You can set positive for the normal pass and negative for the hr pass, or vice versa, for some interesting effects.
 
-> By default, this Extension is disabled during the [ADetailer](https://github.com/Bing-su/adetailer) phase 
+There is also an advanced scaling setting, allowing you to adjust the strength throughout the process *(**eg.** lower the sharpness towards the end)*.
+
+> This Extension is disabled during the [ADetailer](https://github.com/Bing-su/adetailer) phase
 
 **Note:** `Ancestral` samplers *(**eg.** `Euler a`)* do **not** work. Tested and confirmed to work for both `Euler` and `DPM++ 2M Karras`.
 
@@ -42,17 +44,19 @@ You can set positive for the normal pass and negative for the hr pass, or vice v
     </tbody>
 </table>
 
-## How does it work?
-🤷
+<p align="center">
+<img src="samples/plot.jpg">
+</p>
 
-In all seriousness, I initially wrote this Extension to try speeding up the Diffusion process. 
-Since the latent noises gradually converges to around 0, 
+## How does it work?
+I initially wrote this Extension to try speeding up the Diffusion process.
+Since the latent noises gradually converges to around 0,
 I tried to see if I can just add the delta between the current step and the previous step, perhaps multipled by a scaler,
-to the current Tensor, in order to help it reaches 0 faster. 
+to the current Tensor, in order to help it reaches 0 faster.
 However, after fiddling around for a week, I still couldn't get it to consistently produce an actually better result.
 So I gave up on the original idea.
 
-Though in the process, I also found out this "sharpening" interaction. If I had to guess, 
+Though in the process, I also found out this "sharpening" interaction. If I had to guess,
 since the Diffusion is a denoising process, if I add the delta again, then it will overly denoise to create a blurry image;
 if I subtract the delta, then it will basically add the noise back to create a noisy image.
 
@@ -60,7 +64,4 @@ if I subtract the delta, then it will basically add the noise back to create a n
 - [X] Generation InfoText
 - [X] Pasting InfoText Support
 - [X] X/Y/Z Plot Support
-
-<p align="center">
-<img src="samples/plot.jpg">
-</p>
+- [X] Scaling Support

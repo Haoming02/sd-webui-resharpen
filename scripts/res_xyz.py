@@ -20,12 +20,18 @@ def xyz_support(cache: dict):
 
         return _
 
+    def choices_scaling():
+        return ["Flat", "Cos", "Sin", "1 - Cos", "1 - Sin"]
+
     xyz_grid = grid_reference()
 
     extra_axis_options = [
         xyz_grid.AxisOption("[ReSharpen] Sharpness", float, apply_field("decay")),
         xyz_grid.AxisOption(
             "[ReSharpen] HrF. Sharpness", float, apply_field("hr_decay")
+        ),
+        xyz_grid.AxisOption(
+            "[ReSharpen] Scaling", str, apply_field("scaling"), choices=choices_scaling
         ),
     ]
 
