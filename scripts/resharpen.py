@@ -15,7 +15,7 @@ original_callback = KDiffusionSampler.callback_state
 
 
 def hijack_callback(self, d):
-    if not self.trajectory_enable:
+    if not getattr(self, "trajectory_enable", False):
         return original_callback(self, d)
 
     if getattr(self.p, "_ad_inner", False):
