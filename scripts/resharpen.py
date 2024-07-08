@@ -105,11 +105,10 @@ class ReSharpen(scripts.Script):
         hr_decay: float,
         hr_scaling: str,
     ):
+        setattr(KDiffusionSampler, "trajectory_enable", enable)
         if not enable:
             self.XYZ_CACHE.clear()
             return p
-
-        KDiffusionSampler.trajectory_enable = enable
 
         if "decay" in self.XYZ_CACHE:
             decay = float(self.XYZ_CACHE["decay"])
