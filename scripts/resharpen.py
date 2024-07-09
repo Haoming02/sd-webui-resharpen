@@ -63,39 +63,35 @@ class ReSharpen(scripts.Script):
                 value="Flat",
             )
 
-            if not is_img2img:
-                hr_decay = gr.Slider(
-                    label="Hires. Fix Sharpness",
-                    minimum=-1.0,
-                    maximum=1.0,
-                    step=0.1,
-                    value=0.0,
-                )
-                hr_scaling = gr.Radio(
-                    ["Flat", "Cos", "Sin", "1 - Cos", "1 - Sin"],
-                    label="Scaling Settings",
-                    value="Flat",
-                )
+            hr_decay = gr.Slider(
+                label="Hires. Fix Sharpness",
+                minimum=-1.0,
+                maximum=1.0,
+                step=0.1,
+                value=0.0,
+                visible=(not is_img2img),
+            )
+            hr_scaling = gr.Radio(
+                ["Flat", "Cos", "Sin", "1 - Cos", "1 - Sin"],
+                label="Scaling Settings",
+                value="Flat",
+                visible=(not is_img2img),
+            )
 
         self.paste_field_names = []
         self.infotext_fields = [
             (enable, "Resharpen Enabled"),
             (decay, "Resharpen Sharpness"),
             (scaling, "Resharpen Scaling"),
+            (hr_decay, "Resharpen Sharpness Hires"),
+            (hr_scaling, "Resharpen Scaling Hires"),
         ]
-
-        if not is_img2img:
-            self.infotext_fields.append((hr_decay, "Resharpen Sharpness Hires"))
-            self.infotext_fields.append((hr_scaling, "Resharpen Scaling Hires"))
 
         for comp, name in self.infotext_fields:
             comp.do_not_save_to_config = True
             self.paste_field_names.append(name)
 
-        if not is_img2img:
-            return [enable, decay, scaling, hr_decay, hr_scaling]
-        else:
-            return [enable, decay, scaling, decay, scaling]
+        return [enable, decay, scaling, hr_decay, hr_scaling]
 
     def process(
         self,
