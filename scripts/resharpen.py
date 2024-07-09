@@ -2,8 +2,9 @@ from modules.sd_samplers_kdiffusion import KDiffusionSampler
 from scripts.res_scaling import apply_scaling
 from scripts.res_xyz import xyz_support
 from modules import script_callbacks
+from modules.shared import opts
+
 import modules.scripts as scripts
-import modules.shared as opts
 import gradio as gr
 
 from modules.processing import (
@@ -133,7 +134,7 @@ class ReSharpen(scripts.Script):
             if isinstance(p, StableDiffusionProcessingImg2Img):
                 self.XYZ_CACHE.clear()
                 dnstr: float = getattr(p, "denoising_strength", 1.0)
-                if dnstr < 1.0 and not opts.img2img_fix_steps:
+                if dnstr < 1.0 and not getattr(opts, "img2img_fix_steps", False):
                     KDiffusionSampler.traj_totalsteps = int(p.steps * dnstr + 1.0)
 
             else:
@@ -178,7 +179,11 @@ class ReSharpen(scripts.Script):
         KDiffusionSampler.traj_decay = hr_decay / -10.0
         KDiffusionSampler.traj_cache = None
         KDiffusionSampler.traj_scaling = hr_scaling
-        KDiffusionSampler.traj_totalsteps = p.hr_second_pass_steps
+        KDiffusionSampler.traj_totalsteps = (
+            p.steps
+            if not getattr(p, "hr_second_pass_steps", 0)
+            else p.hr_second_pass_steps
+        )
 
         assert len(self.XYZ_CACHE) == 0
         return p
