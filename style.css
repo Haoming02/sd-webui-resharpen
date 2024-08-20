@@ -1,0 +1,12 @@
+.gradio-group.resharpen:not(.hr) {
+    margin: 2em 0em;
+}
+
+.gradio-group.resharpen fieldset div.wrap {
+    justify-content: center !important;
+    gap: 0.5em !important;
+}
+
+.gradio-group.resharpen fieldset div.wrap label {
+    border-radius: 0.5em;
+}

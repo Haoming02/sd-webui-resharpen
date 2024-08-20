@@ -1,42 +1,49 @@
-from modules.sd_samplers_kdiffusion import KDiffusionSampler
-from modules import script_callbacks
-from modules.shared import opts
+from modules.processing import StableDiffusionProcessingTxt2Img as txt2img
+from modules.processing import StableDiffusionProcessingImg2Img as img2img
+from modules.sd_samplers_kdiffusion import KDiffusionSampler as KSampler
+from modules.script_callbacks import on_script_unloaded
+from modules.ui_components import InputAccordion
 from modules import scripts
 
 from lib_resharpen.scaling import apply_scaling
+from lib_resharpen.param import ReSharpenParams
 from lib_resharpen.xyz import xyz_support
 
+from functools import wraps
+from typing import Callable
 import gradio as gr
-
-from modules.processing import (
-    StableDiffusionProcessingTxt2Img,
-    StableDiffusionProcessingImg2Img,
-)
-
-original_callback = KDiffusionSampler.callback_state
+import torch
 
 
-def hijack_callback(self, d):
-    if not getattr(self, "trajectory_enable", False):
-        return original_callback(self, d)
+original_callback: Callable = KSampler.callback_state
 
+
+@torch.inference_mode()
+@wraps(original_callback)
+def hijack_callback(self, d: dict):
     if getattr(self.p, "_ad_inner", False):
         return original_callback(self, d)
 
-    if self.traj_cache is not None:
-        delta = d["x"].detach().clone() - self.traj_cache
+    params: ReSharpenParams = getattr(self, "resharpen_params", None)
+
+    if not params:
+        return original_callback(self, d)
+
+    if params.cache is not None:
+        delta: torch.Tensor = d["x"].detach().clone() - params.cache
         d["x"] += delta * apply_scaling(
-            self.traj_scaling, self.traj_decay, d["i"], self.traj_totalsteps
+            params.scaling, params.strength, d["i"], params.total_step
         )
 
-    self.traj_cache = d["x"].detach().clone()
+    params.cache = d["x"].detach().clone()
     return original_callback(self, d)
 
 
-KDiffusionSampler.callback_state = hijack_callback
+KSampler.callback_state = hijack_callback
 
 
 class ReSharpen(scripts.Script):
+
     def __init__(self):
         self.XYZ_CACHE = {}
         xyz_support(self.XYZ_CACHE)
@@ -48,36 +55,35 @@ class ReSharpen(scripts.Script):
         return scripts.AlwaysVisible
 
     def ui(self, is_img2img):
-        with gr.Accordion("ReSharpen", open=False):
-            enable = gr.Checkbox(label="Enable")
+        with InputAccordion(value=False, label=self.title()) as enable:
 
             gr.Markdown(
                 '<h3 style="float: left;">Softer</h3> <h3 style="float: right;">Sharper</h3>'
             )
 
-            decay = gr.Slider(
-                label="Sharpness", minimum=-1.0, maximum=1.0, step=0.1, value=0.0
-            )
-            scaling = gr.Radio(
-                ["Flat", "Cos", "Sin", "1 - Cos", "1 - Sin"],
-                label="Scaling Settings",
-                value="Flat",
-            )
+            with gr.Group(elem_classes="resharpen"):
+                decay = gr.Slider(
+                    label="Sharpness", minimum=-1.0, maximum=1.0, step=0.1, value=0.0
+                )
+                scaling = gr.Radio(
+                    ["Flat", "Cos", "Sin", "1 - Cos", "1 - Sin"],
+                    label="Scaling Settings",
+                    value="Flat",
+                )
 
-            hr_decay = gr.Slider(
-                label="Hires. Fix Sharpness",
-                minimum=-1.0,
-                maximum=1.0,
-                step=0.1,
-                value=0.0,
-                visible=(not is_img2img),
-            )
-            hr_scaling = gr.Radio(
-                ["Flat", "Cos", "Sin", "1 - Cos", "1 - Sin"],
-                label="Scaling Settings",
-                value="Flat",
-                visible=(not is_img2img),
-            )
+            with gr.Group(elem_classes=["resharpen", "hr"], visible=(not is_img2img)):
+                hr_decay = gr.Slider(
+                    label="Hires. Fix Sharpness",
+                    minimum=-1.0,
+                    maximum=1.0,
+                    step=0.1,
+                    value=0.0,
+                )
+                hr_scaling = gr.Radio(
+                    ["Flat", "Cos", "Sin", "1 - Cos", "1 - Sin"],
+                    label="Scaling Settings",
+                    value="Flat",
+                )
 
         self.paste_field_names = []
         self.infotext_fields = [
@@ -102,56 +108,64 @@ class ReSharpen(scripts.Script):
         scaling: str,
         hr_decay: float,
         hr_scaling: str,
+        *args,
+        **kwargs,
     ):
-        setattr(KDiffusionSampler, "trajectory_enable", enable)
+
         if not enable:
             self.XYZ_CACHE.clear()
             return p
 
-        if "decay" in self.XYZ_CACHE:
-            decay = float(self.XYZ_CACHE["decay"])
-            del self.XYZ_CACHE["decay"]
+        if p.sampler_name.strip() == "Euler a":
+            print("\n[ReSharpen] has little effect with Ancestral samplers!\n")
 
-        if "scaling" in self.XYZ_CACHE:
-            scaling = str(self.XYZ_CACHE["scaling"])
-            del self.XYZ_CACHE["scaling"]
+        decay = float(self.XYZ_CACHE.pop("decay", decay))
+        scaling = str(self.XYZ_CACHE.pop("scaling", scaling))
 
-        if enable:
-            p.extra_generation_params["Resharpen Enabled"] = enable
-            p.extra_generation_params["Resharpen Sharpness"] = decay
-            p.extra_generation_params["Resharpen Scaling"] = scaling
+        p.extra_generation_params.update(
+            {
+                "Resharpen Enabled": enable,
+                "Resharpen Sharpness": decay,
+                "Resharpen Scaling": scaling,
+            }
+        )
 
-            if p.sampler_name.strip() == "Euler a":
-                print("\n[Resharpen] has little effect with Ancestral samplers!\n")
+        params = ReSharpenParams(
+            enable,
+            scaling,
+            decay / -10.0,
+            0,
+            None,
+        )
 
-            KDiffusionSampler.traj_decay = decay / -10.0
-            KDiffusionSampler.traj_cache = None
-            KDiffusionSampler.traj_scaling = scaling
+        setattr(KSampler, "resharpen_params", params)
 
-            if isinstance(p, StableDiffusionProcessingImg2Img):
-                self.XYZ_CACHE.clear()
-                dnstr: float = getattr(p, "denoising_strength", 1.0)
-                if dnstr < 1.0 and not getattr(opts, "img2img_fix_steps", False):
-                    KDiffusionSampler.traj_totalsteps = int(p.steps * dnstr + 1.0)
+        if isinstance(p, img2img):
+            self.XYZ_CACHE.clear()
+            return p
 
-            else:
-                assert isinstance(p, StableDiffusionProcessingTxt2Img)
-                KDiffusionSampler.traj_totalsteps = p.steps
+        assert isinstance(p, txt2img)
 
-                if getattr(p, "enable_hr", False):
-                    if "hr_decay" in self.XYZ_CACHE:
-                        hr_decay = float(self.XYZ_CACHE["hr_decay"])
-                    if "hr_scaling" in self.XYZ_CACHE:
-                        hr_scaling = str(self.XYZ_CACHE["hr_scaling"])
+        if not getattr(p, "enable_hr", False):
+            self.XYZ_CACHE.clear()
+            return p
 
-                    p.extra_generation_params["Resharpen Sharpness Hires"] = hr_decay
-                    p.extra_generation_params["Resharpen Scaling Hires"] = hr_scaling
+        hr_decay = float(self.XYZ_CACHE.get("hr_decay", hr_decay))
+        hr_scaling = float(self.XYZ_CACHE.get("hr_scaling", hr_scaling))
+        p.extra_generation_params.update(
+            {
+                "Resharpen Sharpness Hires": hr_decay,
+                "Resharpen Scaling Hires": hr_scaling,
+            }
+        )
 
-                else:
-                    self.XYZ_CACHE.clear()
-
-        assert len(self.XYZ_CACHE) <= 2
         return p
+
+    def process_before_every_sampling(self, p, enable, *args, **kwargs):
+        if enable:
+            KSampler.resharpen_params.total_step = (
+                getattr(p, "firstpass_steps", 0) or p.steps
+            )
 
     def before_hr(
         self,
@@ -161,33 +175,31 @@ class ReSharpen(scripts.Script):
         scaling: str,
         hr_decay: float,
         hr_scaling: str,
+        *args,
+        **kwargs,
     ):
         if not enable:
             return p
 
-        if "hr_decay" in self.XYZ_CACHE:
-            hr_decay = float(self.XYZ_CACHE["hr_decay"])
-            del self.XYZ_CACHE["hr_decay"]
+        hr_decay = float(self.XYZ_CACHE.pop("hr_decay", hr_decay))
+        hr_scaling = float(self.XYZ_CACHE.pop("hr_scaling", hr_scaling))
 
-        if "hr_scaling" in self.XYZ_CACHE:
-            hr_scaling = str(self.XYZ_CACHE["hr_scaling"])
-            del self.XYZ_CACHE["hr_scaling"]
-
-        KDiffusionSampler.traj_decay = hr_decay / -10.0
-        KDiffusionSampler.traj_cache = None
-        KDiffusionSampler.traj_scaling = hr_scaling
-        KDiffusionSampler.traj_totalsteps = (
-            p.steps
-            if not getattr(p, "hr_second_pass_steps", 0)
-            else p.hr_second_pass_steps
+        params = ReSharpenParams(
+            enable,
+            hr_scaling,
+            hr_decay / -10.0,
+            getattr(p, "hr_second_pass_steps", 0) or p.steps,
+            None,
         )
 
-        assert len(self.XYZ_CACHE) == 0
+        setattr(KSampler, "resharpen_params", params)
+
+        self.XYZ_CACHE.clear()
         return p
 
 
 def restore_callback():
-    KDiffusionSampler.callback_state = original_callback
+    KSampler.callback_state = original_callback
 
 
-script_callbacks.on_script_unloaded(restore_callback)
+on_script_unloaded(restore_callback)
