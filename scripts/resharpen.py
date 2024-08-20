@@ -1,10 +1,11 @@
 from modules.sd_samplers_kdiffusion import KDiffusionSampler
-from scripts.res_scaling import apply_scaling
-from scripts.res_xyz import xyz_support
 from modules import script_callbacks
 from modules.shared import opts
+from modules import scripts
 
-import modules.scripts as scripts
+from lib_resharpen.scaling import apply_scaling
+from lib_resharpen.xyz import xyz_support
+
 import gradio as gr
 
 from modules.processing import (
