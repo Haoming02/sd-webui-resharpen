@@ -151,7 +151,7 @@ class ReSharpen(scripts.Script):
             return p
 
         hr_decay = float(self.XYZ_CACHE.get("hr_decay", hr_decay))
-        hr_scaling = float(self.XYZ_CACHE.get("hr_scaling", hr_scaling))
+        hr_scaling = str(self.XYZ_CACHE.get("hr_scaling", hr_scaling))
         p.extra_generation_params.update(
             {
                 "Resharpen Sharpness Hires": hr_decay,
@@ -182,7 +182,7 @@ class ReSharpen(scripts.Script):
             return p
 
         hr_decay = float(self.XYZ_CACHE.pop("hr_decay", hr_decay))
-        hr_scaling = float(self.XYZ_CACHE.pop("hr_scaling", hr_scaling))
+        hr_scaling = str(self.XYZ_CACHE.pop("hr_scaling", hr_scaling))
 
         params = ReSharpenParams(
             enable,
