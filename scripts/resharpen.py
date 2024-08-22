@@ -113,6 +113,7 @@ class ReSharpen(scripts.Script):
     ):
 
         if not enable:
+            delattr(KSampler, "resharpen_params")
             self.XYZ_CACHE.clear()
             return p
 
