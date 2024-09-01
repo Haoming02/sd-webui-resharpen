@@ -112,9 +112,9 @@ class ReSharpen(scripts.Script):
         **kwargs,
     ):
 
+        setattr(KSampler, "resharpen_params", None)
+        
         if not enable:
-            if hasattr(KSampler, "resharpen_params"):
-                delattr(KSampler, "resharpen_params")
             self.XYZ_CACHE.clear()
             return p
 
@@ -164,9 +164,9 @@ class ReSharpen(scripts.Script):
         return p
 
     def process_before_every_sampling(self, p, enable, *args, **kwargs):
-        if enable:
+        if enable and hasattr(KSampler, "resharpen_params"):
             KSampler.resharpen_params.total_step = (
-                getattr(p, "firstpass_steps", 0) or p.steps
+                getattr(p, "firstpass_steps", None) or p.steps
             )
 
     def before_hr(
@@ -190,7 +190,7 @@ class ReSharpen(scripts.Script):
             enable,
             hr_scaling,
             hr_decay / -10.0,
-            getattr(p, "hr_second_pass_steps", 0) or p.steps,
+            getattr(p, "hr_second_pass_steps", None) or p.steps,
             None,
         )
 
