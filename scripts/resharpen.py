@@ -29,7 +29,7 @@ def hijack_callback(self, d: dict):
     if not params:
         return original_callback(self, d)
 
-    if params.cache is not None:
+    if params.cache is not None and abs(params.strength) > 0.0:
         delta: torch.Tensor = d["x"].detach().clone() - params.cache
         d["x"] += delta * apply_scaling(
             params.scaling, params.strength, d["i"], params.total_step
@@ -113,7 +113,7 @@ class ReSharpen(scripts.Script):
     ):
 
         setattr(KSampler, "resharpen_params", None)
-        
+
         if not enable:
             self.XYZ_CACHE.clear()
             return p
@@ -163,8 +163,9 @@ class ReSharpen(scripts.Script):
 
         return p
 
-    def process_before_every_sampling(self, p, enable, *args, **kwargs):
+    def process_before_every_sampling(self, p, enable: bool, *args, **kwargs):
         if enable and hasattr(KSampler, "resharpen_params"):
+            KSampler.resharpen_params.cache = None
             KSampler.resharpen_params.total_step = (
                 getattr(p, "firstpass_steps", None) or p.steps
             )
